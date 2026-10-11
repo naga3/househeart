@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, copyFileSync, mkdirSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
-import { ENVELOPES, SE, BGM } from './sounds.mjs'
+import { ENVELOPES, SE, BGM, SONGS } from './sounds.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const px = resolve(process.env.PX13H || join(here, '../../px13h'))
@@ -60,7 +60,7 @@ function writeOgg(name, s) {
 }
 
 // BGM の小節の長さが全パートでそろっているか確かめる（全音符 = 1）
-function checkBgm() {
+function checkBgm(BGM = BGMDEF) {
   let ok = true
   BGM.perBar.forEach((bars, p) => {
     let st = initialState(p, p === 3)
@@ -77,21 +77,27 @@ function checkBgm() {
 }
 
 // 繰り返しの 1 周分を取り出す。2 周目を切り出すので、1 周目の余韻が頭に重なって、つなぎ目が自然になる
-async function renderLoop() {
+async function renderLoop(BGM = BGMDEF) {
   const once = await render(BGM.tracks.map((t) => t.replace(/^L /, '')))   // 長さをはかる（L なし）
-  const t = (BGM.bars * 4 * 60) / 160
+  const t = (BGM.bars * 4 * 60) / (BGM.tempo || 160)
   const period = Math.round(t * RATE)
   const two = await render(BGM.tracks, { loop: true, seconds: (period * 2 + 2400) / RATE })
   console.log(`1 周: 計算上 ${t.toFixed(3)} 秒、L なしで鳴らした長さ ${(once.length / RATE).toFixed(3)} 秒`)
   return two.slice(period, period * 2)
 }
 
+const BGMDEF = BGM
 const want = process.argv.slice(2)
 const all = want.length === 0
 if (all || want.includes('bgm')) {
   checkBgm()
   const loop = normalize(await renderLoop(), BGM.peak)
   writeOgg('bgm', loop)
+}
+for (const [name, def] of Object.entries(SONGS)) {
+  if (!want.includes(name) && !want.includes('songs')) continue
+  checkBgm(def)
+  writeOgg(name, normalize(await renderLoop(def), def.peak))
 }
 for (const [name, def] of Object.entries(SE)) {
   if (!all && !want.includes(name)) continue

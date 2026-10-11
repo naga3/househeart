@@ -14,7 +14,7 @@
 - `src/sim.js`: 物理（planck.js）、人の行動、マグマの水位、ヘリ、脱出と失う判定。描画は持たない。`createSim(stage)`
 - `src/nav.js`: 出口までの道筋。直立用（歩く・落ちる・はしご・ジャンプの時間）と、傾いたとき用（壁を避ける距離）の2種類
 - `src/audio.js`: 音の再生。書き出した ogg（`public/audio/`）を AudioBuffer で鳴らすだけ。音源のエミュレーションは実行時に持たない
-- `tools/sounds.mjs`: 効果音と BGM の定義（PX-13h の MML）。曲の好みは `~/src/etc/px13h/docs/taste.md`
+- `tools/sounds.mjs`: 効果音と BGM の定義（PX-13h の MML）。曲の好みは `~/src/etc/px13h/docs/taste.md`。BGM は「明るい」（ハ長調、テンポ 140、24 小節 = A → B → A → B → サビ）。不採用の旧 BGM（`BGM_OLD`）と候補（神秘・疾走感。`SONGS`。`node tools/render-audio.mjs songs` で public/audio/bgm-*.ogg に書き出せる）も定義に残してある
 - `tools/render-audio.mjs`: 定義を PX-13h の音源（`../px13h` の engine.wasm）で鳴らして `public/audio/*.ogg` に書き出す。`node tools/render-audio.mjs [名前...]`。ffmpeg が要る。定義を変えたら書き出し直して、ogg もコミットする
 - `src/main.js`: 描画（インデックスバッファ）と入力
 - 背景：外は夜の火山の風景（`buildBackground` で一度だけ作って毎フレームコピー、星と火口だけ動かす）。家の中は壁紙・窓・絵（`buildHouse`、家と一緒に回る）

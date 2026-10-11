@@ -48,7 +48,7 @@ export const SE = {
 }
 
 // BGM：A の 1 周目（薄く）→ A の 2 周目（エコー、スネア）→ B（1 小節ずつ高く、ドラムが増える）→ サビ（デチューン、シンバル）。
-// イ短調、テンポ 160、20 小節（約 30 秒）。末尾から頭へつなげて繰り返す。各小節は 1 小節ちょうど
+// イ短調、テンポ 160、（旧 BGM_OLD）。末尾から頭へつなげて繰り返す。各小節は 1 小節ちょうど
 const D_thin = 'l8 @v4 o4 g @v2 o5 f f f @v4 o4 g @v2 o5 f f f'
 const D_rock1 = 'l8 @v4 o4 g @v2 o5 f @v3 c+ @v2 f @v4 o4 g g @v3 o5 c+ @v2 f'
 const D_rock2 = 'l8 @v4 o4 g @v2 o5 f @v3 c+ @v2 f @v4 o4 g @v2 o5 f @v3 c+ @v4 o4 g'
@@ -94,7 +94,7 @@ const noi = [
   'v12 ' + D_cym, D_rock1, D_rock2, D_rock1,
   D_cym, D_rock2, D_rock1, D_end,
 ]
-export const BGM = {
+export const BGM_OLD = {
   bars: 20,
   tracks: [
     'L t160 @1 v13 @v0 q7 ~10,8,20 ' + sq1.join(' '),
@@ -106,3 +106,103 @@ export const BGM = {
   perBar: [sq1, sq2, tri, noi],
   peak: 0.5,
 }
+
+// ---- 候補の 3 曲（public/audio/bgm-*.ogg。まだゲームでは鳴らさない。聴き比べて選ぶ）----
+// 各小節は 1 小節ちょうど。音の高さは毎小節 o で指定し直す（途中で切り出しても崩れない）
+const D_hat = 'l8 @v2 o5 f f f f f f f f'
+const D_hatk = 'l8 @v4 o4 g @v2 o5 f f f @v4 o4 g @v2 o5 f f f'
+const D_snr = 'l8 @v4 o4 g @v2 o5 f @v3 c+ @v2 f @v4 o4 g @v2 o5 f @v3 c+ @v2 f'
+const D_drive = 'l8 @v4 o4 g @v2 o5 f @v3 c+ @v4 o4 g @v4 g @v2 o5 f @v3 c+ @v2 f'
+const D_run = 'l16 @v4 o4 g @v2 o5 f @v2 f @v2 f @v3 c+ @v2 f @v2 f @v2 f @v4 o4 g @v2 o5 f @v4 o4 g @v2 o5 f @v3 c+ @v2 f @v3 c+ @v3 c+'
+const D_cym1 = 'l8 @v21 o5 c @v2 f @v3 c+ @v2 f @v4 o4 g @v2 o5 f @v3 c+ @v2 f'
+
+// 1 つ目の矩形波の音を、8 分遅れの小さなエコーにする（小節の最後の音を 8 分ぶん短くする）
+const shorten = { 4: '8', 2: '4.', '4.': '4' }
+const echoBar = (bar) => {
+  const m = [...bar.matchAll(/\b([a-g][+-]?)(4\.|4|2)(?![0-9.])/g)].pop()
+  if (!m) throw new Error('エコーにできない小節: ' + bar)
+  const cut = bar.slice(0, m.index) + m[1] + shorten[m[2]] + bar.slice(m.index + m[0].length)
+  return 'r8 ' + cut
+}
+const mkSong = ({ tempo, bars, mel, mel2, tri, noi, peak = 0.5, vel = 13 }) => ({
+  bars, tempo,
+  tracks: [
+    `L t${tempo} @1 v${vel} @v0 q7 ~10,8,20 ` + mel.join(' '),
+    'L @1 v10 @v0 q7 ' + mel2.join(' '),
+    'L q6 ' + tri.join(' '),
+    'L ' + noi.join(' '),
+  ],
+  perBar: [mel, mel2, tri, noi],
+  peak,
+})
+
+// 1. 神秘（ニ短調のドリア。テンポ 100、16 小節）：長い音をしゃくり上げて、エコーとデチューンで広げる。ドラムは 8 分のハイハットだけ
+{
+  const mel = [
+    'v10 o4 @p8 a2 @p o5 d4 f4', 'o5 @p8 e2 @p d4 c4', 'o4 @p8 a2 @p o5 c4 d4', 'o5 @p8 e2. @p g4',
+    'o5 @p8 f2 @p e4 d4', 'o5 @p8 d2 @p f4 g4', 'o5 @p8 g2 @p f4 d4', 'o5 @p8 e2 @p c+4 e4',
+    'v12 o5 d4 f4 a4 o6 d4', 'o5 f4 a4 o6 d4 f4', 'o5 a4 o6 c4 e4 d4', 'o6 c4 e4 g4 e4',
+    'o6 d4. c8 o5 a2', 'o5 f4. a8 o6 d2', 'o5 g4. a+8 o6 d2', 'o6 @p8 c+2 @p o5 e4 a4',
+  ]
+  const det = (bar) => bar.replace(/@p8/g, '@p24').replace(/@p(?![0-9])/g, '@p23')
+  const mel2 = [
+    'r1', 'r1', 'r1', 'r1',
+    ...mel.slice(4, 8).map((b) => 'V5 ' + echoBar(b)),
+    ...mel.slice(8).map((b) => 'V12 @p23 ' + det(b)),
+  ]
+  const tri = ['d', 'b-', 'f', 'c', 'd', 'b-', 'g', 'a', 'd', 'b-', 'f', 'c', 'd', 'b-', 'g', 'a'].map((r) => `o2 q6 ${r}1`)
+  const noi = ['r1', 'r1', 'r1', 'r1', ...Array(4).fill('v6 ' + D_hat), ...Array(7).fill('v8 ' + D_hatk), 'v8 ' + D_snr]
+  var MYSTIC = mkSong({ tempo: 100, bars: 16, mel, mel2, tri, noi, peak: 0.5, vel: 12 })
+}
+
+// 2. 明るい（ハ長調。テンポ 140、24 小節）：C G Am F。A → B → A（エコー）→ B（エコー、ドラム増）→ サビ（デチューン）。シンコペーションで弾ませる
+{
+  const mel0 = [
+    'v11 o5 e4 g4 e4 c4', 'o5 d4 g4 b4 g4', 'o5 c4 e4 a2', 'o5 a4 f4 c4 f4',
+    'o5 r8 e8 g4 e8 g8 >c4', 'o5 r8 d8 g4 b4 >d4', 'o5 r8 c8 e4 a4 g4', 'o5 f4 a4 >c2',
+    'v13 o5 e4. g8 a4 g4', 'o5 g4. f8 d4 g4', 'o5 e4. d8 c4 e4', 'o5 f4 a4 g4 f4',
+    'o5 e4. g8 >c4 <g4', 'o5 g4 b4 a4 g4', 'o5 a4 f4 d4 g4', 'o5 @p8 e1 @p',
+  ]
+  const A = mel0.slice(0, 4), B = mel0.slice(4, 8), C = mel0.slice(8)
+  const mel = [...A, ...B, ...A, ...B, ...C]
+  const det = (bar) => bar.replace(/@p8/g, '@p24').replace(/@p(?![0-9])/g, '@p23')
+  const mel2 = [
+    'r1', 'r1', 'r1', 'r1',
+    ...B.map((b) => 'V5 ' + echoBar(b)), ...A.map((b) => 'V5 ' + echoBar(b)), ...B.map((b) => 'V5 ' + echoBar(b)),
+    ...C.map((b) => 'V11 @p23 ' + det(b)),
+  ]
+  const b = (r1, r2 = r1) => `o2 l8 ${r1} >${r1} <${r1} >${r1} <${r2} >${r2} <${r2} >${r2}`
+  const tri0 = [b('c'), b('g'), b('a'), b('f'), b('c'), b('g'), b('a'), b('f'), b('c'), b('g'), b('a'), b('f'), b('c'), b('g'), b('f', 'g'), b('c')]
+  const tri = [...tri0.slice(0, 8), ...tri0.slice(0, 8), ...tri0.slice(8)]
+  const noi = [
+    ...Array(4).fill('v7 ' + D_hatk), ...Array(3).fill('v9 ' + D_snr), 'v9 ' + D_run,
+    ...Array(4).fill('v9 ' + D_snr), ...Array(3).fill('v10 ' + D_snr), 'v10 ' + D_run,
+    'v12 ' + D_cym1, ...Array(6).fill('v11 ' + D_snr), 'v11 ' + D_run,
+  ]
+  var BRIGHT = mkSong({ tempo: 140, bars: 24, mel, mel2, tri, noi, peak: 0.5 })
+}
+
+// 3. 疾走感（イ短調。テンポ 176、16 小節）：Am F C G を 4 周。16 分の駆け上がりと、休みなく進む 8 分のベース
+{
+  const mel = [
+    'v12 o5 a8 a8 >c8 e8 a4 e8 c8', 'o5 f8 f8 a8 >c8 f4 c8 <a8', 'o5 g8 g8 >c8 e8 g4 e8 c8', 'o5 g8 g8 b8 >d8 g4 d8 <b8',
+    'o5 a8 a8 >c8 e8 a4 g8 e8', 'o5 f8 a8 >c8 f8 a4 g8 f8', 'o5 e8 g8 >c8 e8 g4 e8 c8', 'o5 d8 g8 b8 >d8 g2',
+    'v13 o6 e4 a4 g8 e8 c8 e8', 'o5 a8 >c8 f8 a8 >c4 a8 f8', 'o6 e8 g8 e8 c8 g4 e8 c8', 'o5 b8 >d8 g8 b8 >d8 b8 g8 d8',
+    'o6 a8 g8 e8 c8 a8 g8 e8 c8', 'o6 f8 e8 c8 <a8 >f8 e8 c8 <a8', 'o6 e8 g8 e8 g8 c8 e8 c8 e8', 'o6 d8 b8 g8 d8 <b2',
+  ]
+  const det = (bar) => bar
+  const mel2 = [
+    'r1', 'r1', 'r1', 'r1',
+    ...mel.slice(4, 8).map((b) => 'V5 ' + echoBar(b)),
+    ...mel.slice(8).map((b) => 'V11 @p23 ' + det(b)),
+  ]
+  const b = (r) => `o2 l8 ${r} ${r} >${r} ${r} <${r} ${r} >${r} ${r}`
+  const tri = [b('a'), b('f'), b('c'), b('g'), b('a'), b('f'), b('c'), b('g'), b('a'), b('f'), b('c'), b('g'), b('a'), b('f'), b('c'), b('g')]
+  const noi = [
+    ...Array(3).fill('v8 ' + D_drive), 'v8 ' + D_run, ...Array(3).fill('v10 ' + D_drive), 'v10 ' + D_run,
+    'v12 ' + D_cym1, ...Array(2).fill('v12 ' + D_drive), 'v12 ' + D_run, ...Array(3).fill('v12 ' + D_drive), 'v12 ' + D_run,
+  ]
+  var RUSH = mkSong({ tempo: 176, bars: 16, mel, mel2, tri, noi, peak: 0.5 })
+}
+export const BGM = BRIGHT // ゲームの BGM は「明るい」（旧 BGM_OLD は不採用）
+export const SONGS = { 'bgm-mystic': MYSTIC, 'bgm-rush': RUSH }
