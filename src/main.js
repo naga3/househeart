@@ -752,7 +752,7 @@ function drawTitle(t) {
 }
 
 // 面選択：5 × 2 のマス。番号と、最高の評価。閉じている面は灰色
-const CELL = { w: 50, h: 44 }
+const CELL = { w: 50, h: 50 }
 let cursor = 0
 function cellRect(i) {
   const col = i % 5, row = Math.floor(i / 5)
@@ -770,13 +770,14 @@ function drawSelect(t) {
     if (i === cursor) rect(r.x, r.y, r.w, r.h, 25), rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, c), rect(r.x + 2, r.y + 2, r.w - 4, r.h - 4, 25)
     else rect(r.x, r.y, r.w, r.h, 25)
     const num = String(i + 1)
-    text(num, r.x + Math.round((r.w - textWidth(num, 3)) / 2), r.y + 6, open ? 19 : 22, 3)
+    text(num, r.x + Math.round((r.w - textWidth(num, 3)) / 2), r.y + 4, open ? 19 : 22, 3)
     if (!open) centered2('LOCK', r.x, r.w, r.y + 28, 22)
     else if (bestOf(i) > 0) {
       const rk = rankOf(bestOf(i), st.total)
-      if (rk === 'S') drawCrown(r.x + ((r.w - 13) >> 1), r.y + 26, 1)
-      else centered2(rk, r.x, r.w, r.y + 24, RANKS[rk].color, 2)
-      centered2(`${bestOf(i)}/${st.total}`, r.x, r.w, r.y + 35, 21)
+      if (rk === 'S') drawCrown(r.x + ((r.w - 13) >> 1), r.y + 22, 1)
+      else centered2(rk, r.x, r.w, r.y + 21, RANKS[rk].color, 2)
+      centered2(`${bestOf(i)}/${st.total}`, r.x, r.w, r.y + 32, 21)
+      if (timeOf(i)) centered2(fmtTime(timeOf(i)), r.x, r.w, r.y + 41, 22)
     } else centered2('NEW', r.x, r.w, r.y + 28, 12)
   })
   centered(STAGES[cursor].name, y0 + 150, 20)
