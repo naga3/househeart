@@ -1181,3 +1181,10 @@ function frame(now) {
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
+
+// 紹介動画の書き出し（tools/make-promo.mjs）が、画面を操作・加工するための口。ふだんは何もしない
+if (globalThis.__HH_HOOK) {
+  Object.assign(globalThis.__HH_HOOK, { text, rect, centered, flush, startStage, showSelect, showTitle, W, H, textWidth })
+  Object.defineProperty(globalThis.__HH_HOOK, 'sim', { get: () => sim })
+  Object.defineProperty(globalThis.__HH_HOOK, 'resultShown', { get: () => resultShown() })
+}
