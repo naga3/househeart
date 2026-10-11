@@ -35,10 +35,10 @@ const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_
 const done = new Promise((res) => ff.on('close', res))
 let now = 1000, nFrames = 0, recording = true
 const sounds = [] // { t, name }
-async function frame(caption) {
+async function frame(caption, keep = true) {
   now += STEP_MS
   const f = cb; cb = null; f(now)
-  if (!recording) return
+  if (!recording || !keep) return
   if (caption) {
     const lines = Array.isArray(caption) ? caption : [caption]
     lines.forEach((line, i) => {
@@ -56,14 +56,18 @@ const seconds = () => nFrames / FPS
 async function hold(sec, caption) { for (let i = 0; i < Math.round(sec * FPS); i++) await frame(caption) }
 
 // 1 面分を遊ぶ。plan(t) が傾ける角度（度）、captions は [秒, 文字] の並び（その秒から次まで）
-async function play(stageIndex, plan, captions, tail = 2.5) {
+async function play(stageIndex, plan, captions, tail = 2.5, speed = () => 1) {
   hook.startStage(stageIndex)
   const s = hook.sim
-  let saved = 0, shown = 0
+  let saved = 0, shown = 0, acc = 0
   while (!(hook.resultShown && shown > tail * FPS)) {
     s.targetAngle = (plan(s.time) * Math.PI) / 180
     const cap = [...captions].reverse().find(([t]) => s.time >= t)
-    await frame(s.over ? null : cap && cap[1])
+    // 倍速：コマを間引く（結果が出たら等倍）
+    acc += hook.resultShown ? 1 : 1 / speed(s.time)
+    const keep = acc >= 1
+    if (keep) acc -= 1
+    await frame(s.over ? null : cap && cap[1], keep)
     if (!recording) { if (hook.resultShown) shown++; continue }
     if (s.saved > saved) { for (let i = saved; i < s.saved; i++) sounds.push({ t: seconds(), name: 'rescue', rate: Math.pow(2, (Math.min(i - saved, 7) * 2) / 12) }); saved = s.saved }
     if (hook.resultShown) { if (shown === 0) sounds.push({ t: seconds(), name: s.saved === s.total ? 'win' : s.saved / s.total >= 0.5 ? 'ok' : 'lose' }); shown++ }
@@ -72,10 +76,10 @@ async function play(stageIndex, plan, captions, tail = 2.5) {
 }
 
 // --- 台本 ---
-await hold(3.5)                                                       // タイトル
+await hold(2)                                                         // タイトル
 const r1 = await play(0, (t) => (t >= 1.5 && t < 3.5 ? 25 : t >= 3.5 && t < 5 ? -25 : 0),
-  [[0, 'TURN THE HOUSE'], [3.5, 'PEOPLE WALK ON THEIR OWN']])
-hook.showSelect(); await hold(2.2, 'TEN HOUSES. EVERY ONE DIFFERENT.')  // 面選択
+  [[0, 'TURN THE HOUSE'], [4, 'PEOPLE WALK ON THEIR OWN']], 1.2, () => 2.2)
+hook.showSelect(); await hold(1.4, 'TEN HOUSES. EVERY ONE DIFFERENT.')  // 面選択
 // 面 8 の傾け方は、下見（映像なし）でいちばん良いものを選ぶ
 const cands = [[30, 2, 9], [30, 4, 11], [18, 4, 11], [60, 1, 8], [30, 3, 10], [25, 2, 9], [35, 2, 9], [30, 2, 8]]
 recording = false
@@ -87,8 +91,9 @@ for (const [sg, a, b] of cands) {
 }
 recording = true
 const r8 = await play(7, (t) => (t >= bestPlan.a && t < bestPlan.b ? bestPlan.sg : 0),
-  [[0, 'LAVA IS RISING'], [3, 'TILT TO CLIMB THE WALLS'], [10, 'MIND THE ROPE!'], [17, 'SAVE EVERYONE']], 3)
-hook.showTitle(); await hold(5, ['PLAY FREE IN YOUR BROWSER', 'NAGA3.GITHUB.IO/HOUSEHEART'])   // 終わりのカード
+  [[0, 'LAVA IS RISING'], [2, 'TILT TO CLIMB THE WALLS'], [10, 'MIND THE ROPE!'], [18, 'SAVE EVERYONE']], 1.8,
+  (t) => (t < 2 ? 3 : t < 9 ? 2 : 2.6))
+hook.showTitle(); await hold(3.5, ['PLAY FREE IN YOUR BROWSER', 'NAGA3.GITHUB.IO/HOUSEHEART'])   // 終わりのカード
 console.log('面1', r1, '面8', r8)
 ff.stdin.end()
 await done
