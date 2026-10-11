@@ -759,15 +759,14 @@ function cellRect(i) {
   return { x: Math.round(CX - (5 * CELL.w) / 2) + col * CELL.w + 2, y: 70 + row * (CELL.h + 4), w: CELL.w - 4, h: CELL.h }
 }
 const BACK = { x: W - 54, y: H - 14, w: 48, h: 11, label: '< TITLE' }
-function drawSelect(t) {
-  const [, y0] = panel(280, 176, CY + 6)
-  centered('SELECT STAGE', y0 + 8, 11, 2)
+function drawCells(showCursor) {
   STAGES.forEach((st, i) => {
     const r = cellRect(i)
     const open = isUnlocked(i)
-    const c = i === cursor ? 11 : open ? 19 : 22
+    const cur = showCursor && i === cursor
+    const c = cur ? 11 : open ? 19 : 22
     rect(r.x - 1, r.y - 1, r.w + 2, r.h + 2, c)
-    if (i === cursor) rect(r.x, r.y, r.w, r.h, 25), rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, c), rect(r.x + 2, r.y + 2, r.w - 4, r.h - 4, 25)
+    if (cur) rect(r.x, r.y, r.w, r.h, 25), rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, c), rect(r.x + 2, r.y + 2, r.w - 4, r.h - 4, 25)
     else rect(r.x, r.y, r.w, r.h, 25)
     const num = String(i + 1)
     text(num, r.x + Math.round((r.w - textWidth(num, 3)) / 2), r.y + 5, open ? 19 : 22, 3)
@@ -780,9 +779,75 @@ function drawSelect(t) {
       if (timeOf(i)) centered2(fmtTime(timeOf(i)), r.x, r.w, r.y + 47, 22)
     } else centered2('NEW', r.x, r.w, r.y + 32, 12)
   })
+}
+const SHARE_BTN = { x: 6, y: H - 14, w: 48, h: 11, label: 'SHARE X' }
+let notice = null // { text, until }
+function drawSelect(t) {
+  const [, y0] = panel(280, 176, CY + 6)
+  centered('SELECT STAGE', y0 + 8, 11, 2)
+  drawCells(true)
   centered(STAGES[cursor].name, y0 + 160, 20)
+  if (notice && Date.now() < notice.until) centered(notice.text, y0 + 172, 12)
+  button(SHARE_BTN, 21)
   button(BACK, 21)
 }
+
+// --- Xでシェア：面選択のマスを画像にして渡す ---
+const SHARE_SCALE = 4
+const SHARE_URL = 'https://naga3.github.io/househeart/'
+// マス全体を、余白つきで切り出して整数倍に拡大する（ドットのまま）。選択枠は入れない
+function shareImageData() {
+  const first = cellRect(0), last = cellRect(STAGES.length - 1)
+  const pad = 5
+  const x0 = first.x - pad, y0 = first.y - pad
+  const w = last.x + last.w - first.x + pad * 2, h = last.y + last.h - first.y + pad * 2
+  const saved = fb.slice()
+  rect(x0, y0, w, h, 25)
+  drawCells(false)
+  const sw = w * SHARE_SCALE, sh = h * SHARE_SCALE
+  const data = new Uint8ClampedArray(sw * sh * 4)
+  const o32 = new Uint32Array(data.buffer)
+  for (let y = 0; y < sh; y++) {
+    const row = (y0 + ((y / SHARE_SCALE) | 0)) * W + x0
+    for (let x = 0; x < sw; x++) o32[y * sw + x] = PAL32[fb[row + ((x / SHARE_SCALE) | 0)]]
+  }
+  fb.set(saved)
+  return { data, w: sw, h: sh }
+}
+function shareText() {
+  const best = STAGES.reduce((n, st, i) => n + (bestOf(i) > 0 && rankOf(bestOf(i), st.total) === 'S' ? 1 : 0), 0)
+  return `HOUSEHEART（家の心）\n家を回して、人を助けるゲーム。全員助けた面 ${best}/${STAGES.length}\n#HOUSEHEART\n${SHARE_URL}`
+}
+function setNotice(text) { notice = { text, until: Date.now() + 4000 } }
+async function shareStages() {
+  try {
+    const { data, w, h } = shareImageData()
+    const cv = document.createElement('canvas')
+    cv.width = w; cv.height = h
+    cv.getContext('2d').putImageData(new ImageData(data, w, h), 0, 0)
+    const blob = await new Promise((res) => cv.toBlob(res, 'image/png'))
+    if (!blob) throw new Error('no image')
+    const file = new File([blob], 'househeart.png', { type: 'image/png' })
+    const text = shareText()
+    // スマホなど：共有シートから X のアプリへ、画像つきで渡せる
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], text })
+      return
+    }
+    // パソコンなど：画像を保存して、X の投稿画面を開く（画像は自分で添付する）
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'househeart.png'
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+    window.open(`https://x.com/intent/post?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
+    setNotice('IMAGE SAVED - ATTACH IT TO THE POST')
+  } catch (e) {
+    if (e && e.name === 'AbortError') return // 共有をやめた
+    setNotice('SHARE FAILED')
+  }
+}
+let shareArmed = false // 共有は、指を離したときに始める（スマホは、離したときが「操作」に数えられるため）
 const centered2 = (str, x, w, y, c, sc = 1) => text(str, x + Math.round((w - textWidth(str, sc)) / 2), y, c, sc)
 
 const audio = createAudio()
@@ -944,6 +1009,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (screen === 'title') { showSelect(); return }
   if (screen === 'select') {
     if (inRect(px, py, BACK)) { showTitle(); return }
+    if (inRect(px, py, SHARE_BTN)) { shareArmed = true; return }
     for (let i = 0; i < STAGES.length; i++) {
       if (inRect(px, py, cellRect(i)) && isUnlocked(i)) { cursor = i; startStage(i); return }
     }
@@ -966,7 +1032,11 @@ canvas.addEventListener('pointermove', (e) => {
   sim.targetAngle = Math.max(-MAX_TILT, Math.min(MAX_TILT, sim.targetAngle + d))
   drag.last = a
 })
-canvas.addEventListener('pointerup', () => { drag = null; wakeAudio() })
+canvas.addEventListener('pointerup', () => {
+  drag = null
+  wakeAudio()
+  if (shareArmed) { shareArmed = false; shareStages() }
+})
 window.addEventListener('touchend', wakeAudio, { passive: true })
 window.addEventListener('click', wakeAudio)
 window.addEventListener('keydown', (e) => {
