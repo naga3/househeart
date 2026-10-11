@@ -120,6 +120,7 @@ export function buildStage(def, index) {
     exitX,
     dividers: (def.dividers || []).map((d) => ({ x: mx(d.x), level: d.level, h: d.h })),
     lava: { speed: def.lava[0], accel: def.lava[1] },
+    limit: lavaLimit(def.lava[0], def.lava[1], tops[0] - 5.15, roofY), // マグマが屋根へ届くまでの時間（秒）。スコアの時間の基準
     lavaStart: tops[0] - 5.15, // 1 階の床の 5.15m 下から上がってくる
     roofY,
     exitJudgeY: roofY + 0.6, // これより上へ出た人は、出口を出たことにする
@@ -387,6 +388,20 @@ const DEFS = [
     lava: [0.34, 0.004],
   },
 ]
+
+// マグマが屋根の高さに届くまでの時間。lavaStart + speed*t + accel*t² = roofY を解く
+function lavaLimit(speed, accel, start, roofY) {
+  const d = roofY - start
+  return accel > 0 ? (-speed + Math.sqrt(speed * speed + 4 * accel * d)) / (2 * accel) : d / speed
+}
+
+// スコア = 助けた人数 × 1000 + タイムボーナス（最大 900 × 助けた割合。1 人ぶんを超えないので、1 人多く助けるほうが必ず高い）
+// time は最後に助けた時刻（秒）、limit はその面の制限時間
+export function scoreOf(saved, total, time, limit) {
+  if (saved <= 0 || time == null) return saved * 1000
+  const bonus = 900 * Math.max(0, 1 - time / limit) * (saved / total)
+  return saved * 1000 + Math.round(bonus)
+}
 
 export const STAGES = DEFS.map(buildStage)
 export const STAGE_COUNT = STAGES.length

@@ -1,6 +1,6 @@
 import { createAudio } from './audio.js'
 import { createSim, MAX_TILT } from './sim.js'
-import { STAGES } from './stages.js'
+import { STAGES, scoreOf } from './stages.js'
 
 // 画面は 320x240、32色（ENDESGA 32）のパレット番号で持つ
 const W = 320, H = 240
@@ -637,8 +637,14 @@ const PROGRESS_KEY = 'lava-house-progress'
 function loadProgress() {
   try {
     const j = JSON.parse(localStorage.getItem(PROGRESS_KEY))
-    return { best: Array.isArray(j && j.best) ? j.best : [], times: Array.isArray(j && j.times) ? j.times : [] }
-  } catch { return { best: [], times: [] } }
+    const best = Array.isArray(j && j.best) ? j.best : [], times = Array.isArray(j && j.times) ? j.times : []
+    const scores = Array.isArray(j && j.scores) ? j.scores : []
+    // 前の記録（人数とタイム）から、スコアを計算し直す
+    best.forEach((n, i) => {
+      if (n > 0 && !scores[i] && STAGES[i]) scores[i] = scoreOf(n, STAGES[i].total, times[i] || null, STAGES[i].limit)
+    })
+    return { best, times, scores }
+  } catch { return { best: [], times: [], scores: [] } }
 }
 function saveProgress() {
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)) } catch { /* 保存できなくてもよい */ }
@@ -646,7 +652,9 @@ function saveProgress() {
 const progress = loadProgress()
 const unlockAll = typeof location !== 'undefined' && /[?&]unlock/.test(location.search)
 const bestOf = (i) => progress.best[i] || 0
-const timeOf = (i) => progress.times[i] || 0 // 最高の人数を助けたときの、いちばん速いクリアタイム（秒。0 は記録なし）
+const scoreAt = (i) => progress.scores[i] || 0 // 面ごとの最高スコア
+const totalScore = () => STAGES.reduce((n, _, i) => n + scoreAt(i), 0)
+const timeOf = (i) => progress.times[i] || 0 // 最高スコアのときのクリアタイム（秒。0 は記録なし）
 const fmtTime = (sec) => sec.toFixed(1)
 const isCleared = (i) => bestOf(i) >= Math.ceil(STAGES[i].total * 0.5)
 const isUnlocked = (i) => unlockAll || i === 0 || isCleared(i - 1)
@@ -720,7 +728,7 @@ function drawResult(t) {
   // クリアタイム（最後に助けた時刻）と、ベスト
   if (result.time !== null) {
     const tm = `TIME ${fmtTime(result.time)}`
-    text(tm, x0 + 64, y0 + 46, result.isNewTime || result.isNew ? 11 : 19)
+    text(tm, x0 + 64, y0 + 46, result.isNew ? 11 : 19)
     const bt = timeOf(stageIdx)
     if (bt) text(`BEST ${fmtTime(bt)}`, x0 + 64 + textWidth(tm) + 6, y0 + 46, 21)
   }
@@ -732,8 +740,8 @@ function drawResult(t) {
     rect(Math.round(CX - row / 2) + i * (size + gap), y0 + 56, size, size, sim.outcomes[i] === 'saved' ? 12 : 8)
   }
   const blink = Math.floor(t * 2) & 1
-  if ((result.isNew || result.isNewTime) && blink) centered(result.isNew ? 'NEW RECORD!' : 'NEW TIME!', y0 + 70, 11, 2)
-  else centered(`BEST ${bestOf(stageIdx)}/${total}`, y0 + 74, 21)
+  if (result.isNew && blink) centered('NEW RECORD!', y0 + 70, 11, 2)
+  else centered(`TOTAL SCORE ${totalScore()}`, y0 + 74, 21)
   if (result.firstClear && stageIdx + 1 < STAGES.length) centered(`STAGE ${stageIdx + 2} OPEN`, y0 + 90, 12)
   else if (!result.cleared) centered('SAVE HALF TO OPEN THE NEXT', y0 + 90, 22)
   for (const b of resultButtons()) button(b, b.id === 'next' ? 11 : 19)
@@ -786,8 +794,9 @@ function drawSelect(t) {
   const [, y0] = panel(280, 176, CY + 6)
   centered('SELECT STAGE', y0 + 8, 11, 2)
   drawCells(true)
-  centered(STAGES[cursor].name, y0 + 160, 20)
-  if (notice && Date.now() < notice.until) centered(notice.text, y0 + 172, 12)
+  if (notice && Date.now() < notice.until) centered(notice.text, y0 + 151, 12)
+  else centered(STAGES[cursor].name, y0 + 151, 20)
+  centered(`TOTAL SCORE ${totalScore()}`, y0 + 161, 11, 2)
   button(SHARE_BTN, 21)
   button(BACK, 21)
 }
@@ -800,10 +809,13 @@ function shareImageData() {
   const first = cellRect(0), last = cellRect(STAGES.length - 1)
   const pad = 5
   const x0 = first.x - pad, y0 = first.y - pad
-  const w = last.x + last.w - first.x + pad * 2, h = last.y + last.h - first.y + pad * 2
+  const foot = 16 // 下に、合計スコアの行
+  const w = last.x + last.w - first.x + pad * 2, h = last.y + last.h - first.y + pad * 2 + foot
   const saved = fb.slice()
   rect(x0, y0, w, h, 25)
   drawCells(false)
+  const tot = `TOTAL SCORE ${totalScore()}`
+  text(tot, x0 + Math.round((w - textWidth(tot, 2)) / 2), last.y + last.h + 6, 11, 2)
   const sw = w * SHARE_SCALE, sh = h * SHARE_SCALE
   const data = new Uint8ClampedArray(sw * sh * 4)
   const o32 = new Uint32Array(data.buffer)
@@ -815,8 +827,7 @@ function shareImageData() {
   return { data, w: sw, h: sh }
 }
 function shareText() {
-  const best = STAGES.reduce((n, st, i) => n + (bestOf(i) > 0 && rankOf(bestOf(i), st.total) === 'S' ? 1 : 0), 0)
-  return `HOUSEHEART（家の心）\n家を回して、人を助けるゲーム。全員助けた面 ${best}/${STAGES.length}\n#HOUSEHEART\n${SHARE_URL}`
+  return `HOUSEHEART（家の心）\n家を回して人を助けるゲーム。合計スコア ${totalScore()}\n#HOUSEHEART\n${SHARE_URL}`
 }
 function setNotice(text) { notice = { text, until: Date.now() + 4000 } }
 async function shareStages() {
@@ -1142,16 +1153,17 @@ function playEvents(now) {
       audio.bgm(false, 0.6)
       const total = sim.total
       const rank = rankOf(sim.saved, total)
-      const prevBest = bestOf(stageIdx), prevTime = timeOf(stageIdx)
-      const isNew = sim.saved > prevBest
+      const prevScore = scoreAt(stageIdx)
       const wasCleared = isCleared(stageIdx)
       const time = sim.lastSavedAt // 最後に助けた時刻（誰も助けていなければ null）
-      // 同じ人数を助けたときに、より速ければ、タイムの新記録
-      const isNewTime = !isNew && time !== null && sim.saved === prevBest && (!prevTime || time < prevTime)
-      if (isNew) { progress.best[stageIdx] = sim.saved; progress.times[stageIdx] = time || 0; saveProgress() }
-      else if (isNewTime) { progress.times[stageIdx] = time; saveProgress() }
+      const score = scoreOf(sim.saved, total, time, STAGES[stageIdx].limit)
+      const isNew = score > prevScore
+      const moreSaved = sim.saved > bestOf(stageIdx)
+      if (moreSaved) progress.best[stageIdx] = sim.saved
+      if (isNew) { progress.scores[stageIdx] = score; progress.times[stageIdx] = time || 0 }
+      if (isNew || moreSaved) saveProgress()
       const cleared = sim.saved >= Math.ceil(total * 0.5)
-      result = { rank, isNew, isNewTime, time, cleared, firstClear: cleared && !wasCleared }
+      result = { rank, isNew, score, time, cleared, firstClear: cleared && !wasCleared }
       audio.se(rank === 'S' || rank === 'A' ? 'win' : rank === 'D' ? 'lose' : 'ok')
     }
   }
