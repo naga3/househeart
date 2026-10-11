@@ -741,7 +741,7 @@ function drawResult(t) {
   }
   const blink = Math.floor(t * 2) & 1
   if (result.isNew && blink) centered('NEW RECORD!', y0 + 70, 11, 2)
-  else centered(`TOTAL SCORE ${totalScore()}`, y0 + 74, 21)
+  else centered(`SCORE ${totalScore()}`, y0 + 74, 21)
   if (result.firstClear && stageIdx + 1 < STAGES.length) centered(`STAGE ${stageIdx + 2} OPEN`, y0 + 90, 12)
   else if (!result.cleared) centered('SAVE HALF TO OPEN THE NEXT', y0 + 90, 22)
   for (const b of resultButtons()) button(b, b.id === 'next' ? 11 : 19)
@@ -796,7 +796,7 @@ function drawSelect(t) {
   drawCells(true)
   if (notice && Date.now() < notice.until) centered(notice.text, y0 + 151, 12)
   else centered(STAGES[cursor].name, y0 + 151, 20)
-  centered(`TOTAL SCORE ${totalScore()}`, y0 + 161, 11, 2)
+  centered(`SCORE ${totalScore()}`, y0 + 161, 11, 2)
   button(SHARE_BTN, 21)
   button(BACK, 21)
 }
@@ -814,7 +814,7 @@ function shareImageData() {
   const saved = fb.slice()
   rect(x0, y0, w, h, 25)
   drawCells(false)
-  const tot = `TOTAL SCORE ${totalScore()}`
+  const tot = `SCORE ${totalScore()}`
   text(tot, x0 + Math.round((w - textWidth(tot, 2)) / 2), last.y + last.h + 6, 11, 2)
   const sw = w * SHARE_SCALE, sh = h * SHARE_SCALE
   const data = new Uint8ClampedArray(sw * sh * 4)
@@ -827,7 +827,7 @@ function shareImageData() {
   return { data, w: sw, h: sh }
 }
 function shareText() {
-  return `HOUSEHEART（家の心）\n家を回して人を助けるゲーム。合計スコア ${totalScore()}\n#HOUSEHEART\n${SHARE_URL}`
+  return `HOUSEHEART（家の心）\n家を回して人を助けるゲーム。スコア ${totalScore()}\n#HOUSEHEART\n${SHARE_URL}`
 }
 function setNotice(text) { notice = { text, until: Date.now() + 4000 } }
 async function shareStages() {
