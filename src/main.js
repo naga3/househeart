@@ -827,7 +827,7 @@ function shareImageData() {
   return { data, w: sw, h: sh }
 }
 function shareText() {
-  return `HOUSEHEART（家の心）\n家を回して人を助けるゲーム。スコア ${totalScore().toLocaleString("en-US")}\n#HOUSEHEART\n${SHARE_URL}`
+  return `あなたは家の心となり、家族を助けた🎉\nSCORE ${totalScore().toLocaleString('en-US')}点\n#HOUSEHEART\n${SHARE_URL}`
 }
 function setNotice(text) { notice = { text, until: Date.now() + 4000 } }
 async function shareStages() {
