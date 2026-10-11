@@ -829,19 +829,27 @@ async function shareStages() {
     if (!blob) throw new Error('no image')
     const file = new File([blob], 'househeart.png', { type: 'image/png' })
     const text = shareText()
-    // スマホなど：共有シートから X のアプリへ、画像つきで渡せる
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    // スマホ：共有シートから X のアプリへ、画像つきで渡せる
+    // （パソコンの共有シートには X が出ないので使わない。Windows は OS の共有画面になってしまう）
+    const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') || (navigator.userAgentData && navigator.userAgentData.mobile)
+    if (mobile && navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], text })
       return
     }
-    // パソコンなど：画像を保存して、X の投稿画面を開く（画像は自分で添付する）
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'househeart.png'
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+    // パソコン：画像をクリップボードへ入れて（だめなら保存して）、X の投稿画面を開く。投稿画面へ貼り付けてもらう
+    let copied = false
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      copied = true
+    } catch (e) {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'househeart.png'
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+    }
     window.open(`https://x.com/intent/post?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
-    setNotice('IMAGE SAVED - ATTACH IT TO THE POST')
+    setNotice(copied ? 'IMAGE COPIED - PASTE IT (CTRL+V)' : 'IMAGE SAVED - ATTACH IT TO THE POST')
   } catch (e) {
     if (e && e.name === 'AbortError') return // 共有をやめた
     setNotice('SHARE FAILED')
