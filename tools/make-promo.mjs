@@ -111,7 +111,10 @@ for (const s of sounds) {
 }
 // 終わりに 1 秒でフェードアウト
 for (let i = 0; i < RATE; i++) mix[total - 1 - i] *= i / RATE
-const pcm = Int16Array.from(mix, (v) => Math.max(-32768, Math.min(32767, Math.round(v * 32767))))
+let peak = 0
+for (const v of mix) peak = Math.max(peak, Math.abs(v))
+const norm = peak ? 0.8 / peak : 1 // 動画サイトで小さく聞こえないよう、最大を 0.8 にそろえる
+const pcm = Int16Array.from(mix.map((v) => v * norm), (v) => Math.max(-32768, Math.min(32767, Math.round(v * 32767))))
 const h = Buffer.alloc(44)
 h.write('RIFF', 0); h.writeUInt32LE(36 + pcm.length * 2, 4); h.write('WAVE', 8); h.write('fmt ', 12)
 h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(RATE, 24); h.writeUInt32LE(RATE * 2, 28)
